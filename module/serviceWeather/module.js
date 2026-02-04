@@ -1,10 +1,10 @@
 import { serviceDB, moment } from "../../config.js";
 
 const getWeekForecast = async () => {
-    let client = await serviceDB.getClient();
+    let { client, collection } = await serviceDB.getClient();
     const now = moment.utc().toDate();
 
-    const result = await client
+    const result = await collection
         .aggregate([
             {
                 $addFields: {
@@ -22,16 +22,16 @@ const getWeekForecast = async () => {
         ])
         .toArray();
 
-    client = null;
+    await client.close();
 
     return await formatWeekForecast(result);
 };
 
 const getTodayForecast = async () => {
-    let client = await serviceDB.getClient();
+    let { client, collection } = await serviceDB.getClient();
     const now = moment.utc();
 
-    const result = await client
+    const result = await collection
         .aggregate([
             {
                 $addFields: {
@@ -51,7 +51,7 @@ const getTodayForecast = async () => {
         ])
         .toArray();
 
-    client = null;
+    await client.close();
 
     let today = result.shift();
 
@@ -99,9 +99,9 @@ const formatlabelsAndIconsForecast = (partial) => {
         case !cloudCoverBoolean && precipitationBoolean:
             return labelsAndIcons.rainy;
         case cloudCoverBoolean && !precipitationBoolean:
-            return labelsAndIcons.sunny;
-        case !cloudCoverBoolean && !precipitationBoolean:
             return labelsAndIcons.cloudy;
+        case !cloudCoverBoolean && !precipitationBoolean:
+            return labelsAndIcons.sunny;
         default:
             return labelsAndIcons.undefined;
     }
