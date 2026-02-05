@@ -1,10 +1,10 @@
 import { serviceDB, moment } from "../../config.js";
 
 const getWeekForecast = async () => {
-    let { client, collection } = await serviceDB.getClient();
+    let client = await serviceDB.getClient();
     const now = moment.utc().toDate();
 
-    const result = await collection
+    const result = await client
         .aggregate([
             {
                 $addFields: {
@@ -22,16 +22,16 @@ const getWeekForecast = async () => {
         ])
         .toArray();
 
-    await client.close();
+    client = null;
 
     return await formatWeekForecast(result);
 };
 
 const getTodayForecast = async () => {
-    let { client, collection } = await serviceDB.getClient();
+    let client = await serviceDB.getClient();
     const now = moment.utc();
 
-    const result = await collection
+    const result = await client
         .aggregate([
             {
                 $addFields: {
@@ -51,16 +51,20 @@ const getTodayForecast = async () => {
         ])
         .toArray();
 
-    await client.close();
+    client = null;
 
     let today = result.shift();
+    
+    if (today === undefined || today === null) {
+        return null;
+    }
 
     return {
-        waveDirection: findDirection(today.waveDirection.noaa),
-        windDirection: findDirection(today.windDirection.noaa),
-        airTemperature: today.airTemperature.noaa.toFixed(0),
-        waveHeight: today.waveHeight.noaa.toFixed(1),
-        windSpeed: today.windSpeed.noaa.toFixed(1),
+        waveDirection: findDirection(getValue(today.waveDirection)),
+        windDirection: findDirection(getValue(today.windDirection)),
+        airTemperature: getValue(today.airTemperature).toFixed(0),
+        waveHeight: getValue(today.waveHeight).toFixed(1),
+        windSpeed: getValue(today.windSpeed).toFixed(1),
         condition: formatlabelsAndIconsForecast(today),
     };
 };
@@ -87,23 +91,30 @@ const getLabelsAndIcons = (horaUTC) => {
     return partial;
 };
 
+// Helper function to get value from old or new format
+const getValue = (field) => {
+    if (typeof field === 'object' && field !== null && field.noaa !== undefined) {
+        return field.noaa;
+    }
+    return field;
+};
+
 const formatlabelsAndIconsForecast = (partial) => {
-    const cloudCoverBoolean = partial.cloudCover > 10 ? true : false;
-    const precipitationBoolean = partial.precipitation.noaa > 0 ? true : false;
+    const cloudCover = getValue(partial.cloudCover);
+    const precipitation = getValue(partial.precipitation);
+    const cloudCoverBoolean = cloudCover > 10 ? true : false;
+    const precipitationBoolean = precipitation > 0 ? true : false;
     const horaUTC = moment.utc(partial.parsedTime).hour();
     const labelsAndIcons = getLabelsAndIcons(horaUTC);
 
-    switch (true) {
-        case cloudCoverBoolean && precipitationBoolean:
-            return labelsAndIcons.rainy;
-        case !cloudCoverBoolean && precipitationBoolean:
-            return labelsAndIcons.rainy;
-        case cloudCoverBoolean && !precipitationBoolean:
-            return labelsAndIcons.cloudy;
-        case !cloudCoverBoolean && !precipitationBoolean:
-            return labelsAndIcons.sunny;
-        default:
-            return labelsAndIcons.undefined;
+    if (cloudCoverBoolean && precipitationBoolean) {
+        return labelsAndIcons.rainy;
+    } else if (precipitationBoolean) {
+        return labelsAndIcons.rainy;
+    } else if (cloudCoverBoolean) {
+        return labelsAndIcons.sunny;
+    } else {
+        return labelsAndIcons.cloudy;
     }
 };
 
@@ -122,17 +133,23 @@ const formatWeekForecast = (week) => {
             color = color === "green" ? "yellow" : "green";
         }
 
+        const airTemp = getValue(day.airTemperature);
+        const waveDir = getValue(day.waveDirection);
+        const waveH = getValue(day.waveHeight);
+        const windDir = getValue(day.windDirection);
+        const windSpd = getValue(day.windSpeed);
+
         return {
             date: dateBrasilia,
             time: timeBrasilia,
             weekDay: weekDay.toUpperCase(),
-            currentTemp: day.airTemperature.noaa.toFixed(0),
-            waveDirection: findDirection(day.waveDirection.noaa).nome,
-            waveDirectionIcon: findDirection(day.waveDirection.noaa).emoji,
-            waveHeight: day.waveHeight.noaa.toFixed(1),
-            windDirection: findDirection(day.windDirection.noaa).nome,
-            windDirectionIcon: findDirection(day.windDirection.noaa).emoji,
-            windSpeed: day.windSpeed.noaa.toFixed(1),
+            currentTemp: airTemp.toFixed(0),
+            waveDirection: findDirection(waveDir).nome,
+            waveDirectionIcon: findDirection(waveDir).emoji,
+            waveHeight: waveH.toFixed(1),
+            windDirection: findDirection(windDir).nome,
+            windDirectionIcon: findDirection(windDir).emoji,
+            windSpeed: windSpd.toFixed(1),
             color: color,
             condicao: formatlabelsAndIconsForecast(day),
         };
