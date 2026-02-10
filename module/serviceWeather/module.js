@@ -1,10 +1,10 @@
 import { serviceDB, moment } from "../../config.js";
 
 const getWeekForecast = async () => {
-    let client = await serviceDB.getClient();
+    const { collection } = await serviceDB.getClient();
     const now = moment.utc().toDate();
 
-    const result = await client
+    const result = await collection
         .aggregate([
             {
                 $addFields: {
@@ -22,16 +22,14 @@ const getWeekForecast = async () => {
         ])
         .toArray();
 
-    client = null;
-
     return await formatWeekForecast(result);
 };
 
 const getTodayForecast = async () => {
-    let client = await serviceDB.getClient();
+    const { collection } = await serviceDB.getClient();
     const now = moment.utc();
 
-    const result = await client
+    const result = await collection
         .aggregate([
             {
                 $addFields: {
@@ -50,8 +48,6 @@ const getTodayForecast = async () => {
             },
         ])
         .toArray();
-
-    client = null;
 
     let today = result.shift();
     

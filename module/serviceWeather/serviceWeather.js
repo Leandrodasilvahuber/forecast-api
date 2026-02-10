@@ -2,6 +2,21 @@ import { getWeekForecast, getTodayForecast } from "./module.js";
 
 const getForecast = async () => {
     const today = await getTodayForecast();
+    
+    if (!today) {
+        return {
+            currentTemp: 0,
+            condition: "Sem Dados",
+            conditionIcon: "❓",
+            waveHeight: 0,
+            waveDirection: "N/A",
+            waveDirectionIcon: "❓",
+            windSpeed: 0,
+            windDirection: "N/A",
+            windDirectionIcon: "❓",
+            forecast: await getWeekForecast(),
+        };
+    }
 
     return {
         currentTemp: today.airTemperature,
